@@ -142,6 +142,7 @@ public class OrderComparator implements Comparator<Object> {
 	 */
 	@Nullable
 	protected Integer findOrder(Object obj) {
+		// 注意子类，本类仅支持Ordered接口
 		return (obj instanceof Ordered ordered ? ordered.getOrder() : null);
 	}
 

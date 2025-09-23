@@ -1250,14 +1250,20 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 		}
 
+		// 判断beanName是否存在
 		BeanDefinition existingDefinition = this.beanDefinitionMap.get(beanName);
 		if (existingDefinition != null) {
+
+			// 看BeanFactory的allowBeanDefinitionOverriding配置是否为false，表示不允许覆盖
 			if (!isBeanDefinitionOverridable(beanName)) {
 				throw new BeanDefinitionOverrideException(beanName, beanDefinition, existingDefinition);
 			}
 			else {
+				// 打Bean覆盖的日志而已
 				logBeanDefinitionOverriding(beanName, beanDefinition, existingDefinition);
 			}
+
+			// 允许覆盖就直接覆盖
 			this.beanDefinitionMap.put(beanName, beanDefinition);
 		}
 		else {

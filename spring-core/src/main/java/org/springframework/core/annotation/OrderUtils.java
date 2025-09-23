@@ -113,17 +113,23 @@ public abstract class OrderUtils {
 		if (cached != null) {
 			return (cached instanceof Integer integer ? integer : null);
 		}
+
 		Integer result = findOrder(annotations);
+
 		orderCache.put(element, result != null ? result : NOT_ANNOTATED);
 		return result;
 	}
 
 	@Nullable
 	private static Integer findOrder(MergedAnnotations annotations) {
+
+		// 获取@Order注解的值
 		MergedAnnotation<Order> orderAnnotation = annotations.get(Order.class);
 		if (orderAnnotation.isPresent()) {
 			return orderAnnotation.getInt(MergedAnnotation.VALUE);
 		}
+
+		// 如果没有@Oreder注解，则获取@Priority注解的值
 		MergedAnnotation<?> priorityAnnotation = annotations.get(JAKARTA_PRIORITY_ANNOTATION);
 		if (priorityAnnotation.isPresent()) {
 			return priorityAnnotation.getInt(MergedAnnotation.VALUE);

@@ -61,10 +61,13 @@ public class AnnotationAwareOrderComparator extends OrderComparator {
 	@Override
 	@Nullable
 	protected Integer findOrder(Object obj) {
+		// 先获取Ordered接口的值
 		Integer order = super.findOrder(obj);
 		if (order != null) {
 			return order;
 		}
+
+		// 没有实现Ordered接口，则继续获取@Order注解或@Priority注解的值
 		return findOrderFromAnnotation(obj);
 	}
 
@@ -72,7 +75,9 @@ public class AnnotationAwareOrderComparator extends OrderComparator {
 	private Integer findOrderFromAnnotation(Object obj) {
 		AnnotatedElement element = (obj instanceof AnnotatedElement ae ? ae : obj.getClass());
 		MergedAnnotations annotations = MergedAnnotations.from(element, SearchStrategy.TYPE_HIERARCHY);
+
 		Integer order = OrderUtils.getOrderFromAnnotations(element, annotations);
+
 		if (order == null && obj instanceof DecoratingProxy decoratingProxy) {
 			return findOrderFromAnnotation(decoratingProxy.getDecoratedClass());
 		}

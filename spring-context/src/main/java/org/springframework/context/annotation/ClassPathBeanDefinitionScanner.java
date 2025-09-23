@@ -164,6 +164,7 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		this.registry = registry;
 
 		if (useDefaultFilters) {
+			// ClassPathBeanDefinitionScanner默认会扫描@Component注解
 			registerDefaultFilters();
 		}
 		setEnvironment(environment);
@@ -273,23 +274,42 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 	protected Set<BeanDefinitionHolder> doScan(String... basePackages) {
 		Assert.notEmpty(basePackages, "At least one base package must be specified");
 		Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<>();
-		for (String basePackage : basePackages) {
+		for (String basePackage : basePackages) {	//可能是多个扫描路径，因为@ComponentScan可以加多个
+
+			// 扫描beanPackage中的所有类，并注册到BeanDefinitionRegistry中（Candidate：候选的）
 			Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
+
 			for (BeanDefinition candidate : candidates) {
+
+				// 获取bean的scope
 				ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
 				candidate.setScope(scopeMetadata.getScopeName());
+
+				// 生成beanName @Component
 				String beanName = this.beanNameGenerator.generateBeanName(candidate, this.registry);
+
+				// 给BeanDefinition对象中的属性赋默认值
 				if (candidate instanceof AbstractBeanDefinition abstractBeanDefinition) {
 					postProcessBeanDefinition(abstractBeanDefinition, beanName);
 				}
+
+				// 解析@Lazy、@Primary、@Fallback、@DependsOn、@Role、@Description等注解并赋值给BeanDefinition对应的属性
 				if (candidate instanceof AnnotatedBeanDefinition annotatedBeanDefinition) {
 					AnnotationConfigUtils.processCommonDefinitionAnnotations(annotatedBeanDefinition);
 				}
+
+				// 检查beanName是否已存在
 				if (checkCandidate(beanName, candidate)) {
+
+					// BeanDefinitionHolder的作用是在BeanDefinition的基础上添加了beanName
 					BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+
+					// 如果设置了ScopedProxyMode，则会生成一个新的BeanDefinition、类型为ScopedProxyFactoryBean
 					definitionHolder =
 							AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
 					beanDefinitions.add(definitionHolder);
+
+					// 注册BeanDefinition（到ioc）
 					registerBeanDefinition(definitionHolder, this.registry);
 				}
 			}

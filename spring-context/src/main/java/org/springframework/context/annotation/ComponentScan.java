@@ -110,11 +110,13 @@ public @interface ComponentScan {
 	 * @see AnnotationBeanNameGenerator
 	 * @see FullyQualifiedAnnotationBeanNameGenerator
 	 */
+	// 可以自定义Bean的名字生成规则，实现BeanNameGenerator即可（默认用 AnnotationBeanNameGenerator）
 	Class<? extends BeanNameGenerator> nameGenerator() default BeanNameGenerator.class;
 
 	/**
 	 * The {@link ScopeMetadataResolver} to be used for resolving the scope of detected components.
 	 */
+	// 解析@Scope注解的解析器，也可以自定义（一遍就用默认default后面的值）
 	Class<? extends ScopeMetadataResolver> scopeResolver() default AnnotationScopeMetadataResolver.class;
 
 	/**
@@ -132,6 +134,7 @@ public @interface ComponentScan {
 	 * <p>Consider use of {@link #includeFilters} and {@link #excludeFilters}
 	 * for a more flexible approach.
 	 */
+	// 扫描指定文件（默认：**/*.class）
 	String resourcePattern() default ClassPathScanningCandidateComponentProvider.DEFAULT_RESOURCE_PATTERN;
 
 	/**
@@ -150,12 +153,14 @@ public @interface ComponentScan {
 	 * @see #resourcePattern()
 	 * @see #useDefaultFilters()
 	 */
+	// 白名单
 	Filter[] includeFilters() default {};
 
 	/**
 	 * Specifies which types are not eligible for component scanning.
 	 * @see #resourcePattern
 	 */
+	// 黑名单
 	Filter[] excludeFilters() default {};
 
 	/**
@@ -163,6 +168,7 @@ public @interface ComponentScan {
 	 * <p>Default is {@code false}; switch this to {@code true} when desired.
 	 * @since 4.1
 	 */
+	// 设置true，表示此注解扫描到的所有Bean都是懒加载
 	boolean lazyInit() default false;
 
 
@@ -180,6 +186,7 @@ public @interface ComponentScan {
 		 * @see #classes
 		 * @see #pattern
 		 */
+		// 指定匹配规则
 		FilterType type() default FilterType.ANNOTATION;
 
 		/**

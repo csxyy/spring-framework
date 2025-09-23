@@ -127,7 +127,7 @@ class ConfigurationClassParser {
 
 	private final BeanDefinitionRegistry registry;
 
-	private final ComponentScanAnnotationParser componentScanParser;
+	private final ComponentScanAnnotationParser componentScanParser;	//Component解析器
 
 	private final ConditionEvaluator conditionEvaluator;
 
@@ -244,6 +244,8 @@ class ConfigurationClassParser {
 
 
 	protected void processConfigurationClass(ConfigurationClass configClass, Predicate<String> filter) {
+
+		// 解析@Conditional注解（条件注解）
 		if (this.conditionEvaluator.shouldSkip(configClass.getMetadata(), ConfigurationPhase.PARSE_CONFIGURATION)) {
 			return;
 		}
@@ -278,6 +280,7 @@ class ConfigurationClassParser {
 		try {
 			sourceClass = asSourceClass(configClass, filter);
 			do {
+				// 先解析当前类，如果有父类就会返回父类然后继续解析
 				sourceClass = doProcessConfigurationClass(configClass, sourceClass, filter);
 			}
 			while (sourceClass != null);
@@ -342,15 +345,19 @@ class ConfigurationClassParser {
 			}
 			for (AnnotationAttributes componentScan : componentScans) {
 				// The config class is annotated with @ComponentScan -> perform the scan immediately
+				// 解析@CompoentScan注解，也就是进行扫描
 				Set<BeanDefinitionHolder> scannedBeanDefinitions =
 						this.componentScanParser.parse(componentScan, sourceClass.getMetadata().getClassName());
+
 				// Check the set of scanned definitions for any further config classes and parse recursively if needed
+				// 遍历扫描结果，看是否扫描出了新的配置类，然后进行解析
 				for (BeanDefinitionHolder holder : scannedBeanDefinitions) {
 					BeanDefinition bdCand = holder.getBeanDefinition().getOriginatingBeanDefinition();
 					if (bdCand == null) {
 						bdCand = holder.getBeanDefinition();
 					}
 					if (ConfigurationClassUtils.checkConfigurationClassCandidate(bdCand, this.metadataReaderFactory)) {
+						//扫描的结果里可以又有配置类，继续解析
 						parse(bdCand.getBeanClassName(), holder.getBeanName());
 					}
 				}
@@ -382,9 +389,11 @@ class ConfigurationClassParser {
 		}
 
 		// Process default methods on interfaces
+		// 处理接口中的默认方法，默认方法上也可以加@Bean
 		processInterfaces(configClass, sourceClass);
 
 		// Process superclass, if any
+		// 返回父类继续解析
 		if (sourceClass.getMetadata().hasSuperClass()) {
 			String superclass = sourceClass.getMetadata().getSuperClassName();
 			if (superclass != null && !superclass.startsWith("java")) {
