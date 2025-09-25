@@ -624,15 +624,19 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				initMessageSource();
 
 				// Initialize event multicaster for this context.
+				// 从容器中找出applicationEventMulticaster对应的Bean并赋值给容器
 				initApplicationEventMulticaster();
 
 				// Initialize other special beans in specific context subclasses.
+				// 模板方法
 				onRefresh();
 
 				// Check for listener beans and register them.
+				// 找出ApplicationListener并赋值给applicationEventMulticaster
 				registerListeners();
 
 				// Instantiate all remaining (non-lazy-init) singletons.
+				// 创建非懒加载的单例Bean
 				finishBeanFactoryInitialization(beanFactory);
 
 				// Last step: publish corresponding event.
@@ -990,9 +994,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		beanFactory.setTempClassLoader(null);
 
 		// Allow for caching all bean definition metadata, not expecting further changes.
+		// 下一步就要创建Bean对象了，这一步冻结BeanDefinition，不允许修改BeanDefinition了
 		beanFactory.freezeConfiguration();
 
 		// Instantiate all remaining (non-lazy-init) singletons.
+		// 创建非懒加载的单例Bean
 		beanFactory.preInstantiateSingletons();
 	}
 

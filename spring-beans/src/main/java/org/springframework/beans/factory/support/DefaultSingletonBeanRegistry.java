@@ -309,6 +309,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				}
 
 				try {
+					// 通过singletonsCurrentlyInCreation这个set来记录当前bean正在创建
 					beforeSingletonCreation(beanName);
 				}
 				catch (BeanCurrentlyInCreationException ex) {
@@ -370,6 +371,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (singletonObject == null) {
 						this.currentCreationThreads.put(beanName, currentThread);
 						try {
+							// 这里会触发创建，会执行外面传进来的lambad表达式（回调 createBean）
 							singletonObject = singletonFactory.getObject();
 						}
 						finally {
@@ -403,6 +405,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 				if (newSingleton) {
 					try {
+						// 添加到单例池
 						addSingleton(beanName, singletonObject);
 					}
 					catch (IllegalStateException ex) {
@@ -602,6 +605,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	public void registerDependentBean(String beanName, String dependentBeanName) {
 		String canonicalName = canonicalName(beanName);
 
+		// dependentBeanName依赖了beanName，也就是dependentBeanName依赖了canonicalName
+
+		// dependentBeanMap的key是canonicalName，value是一个Set<dependentBeanName>
+		// 表示canonicalName被哪些dependentBeanName依赖了
 		synchronized (this.dependentBeanMap) {
 			Set<String> dependentBeans =
 					this.dependentBeanMap.computeIfAbsent(canonicalName, k -> new LinkedHashSet<>(8));
@@ -610,6 +617,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 			}
 		}
 
+		// 表示dependentBeanName依赖了哪些canonicalName
 		synchronized (this.dependenciesForBeanMap) {
 			Set<String> dependenciesForBean =
 					this.dependenciesForBeanMap.computeIfAbsent(dependentBeanName, k -> new LinkedHashSet<>(8));

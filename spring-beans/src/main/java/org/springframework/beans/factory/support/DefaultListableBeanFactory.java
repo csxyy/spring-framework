@@ -1118,8 +1118,10 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		try {
 			List<CompletableFuture<?>> futures = new ArrayList<>();
 			for (String beanName : beanNames) {
+				// 得到合并后的RootBeanDefinition，RootBeanDefinition表示不能合并了
 				RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
 				if (!mbd.isAbstract() && mbd.isSingleton()) {
+					// 这里面会用线程池来并行创建每个Bean
 					CompletableFuture<?> future = preInstantiateSingleton(beanName, mbd);
 					if (future != null) {
 						futures.add(future);
@@ -1154,17 +1156,26 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 	@Nullable
 	private CompletableFuture<?> preInstantiateSingleton(String beanName, RootBeanDefinition mbd) {
+		// 默认为false
 		if (mbd.isBackgroundInit()) {
+			// 线程池
 			Executor executor = getBootstrapExecutor();
+
 			if (executor != null) {
+
+				// 先创建当前Bean所依赖的Bean，这一步是直接在当前线程上执行的
 				String[] dependsOn = mbd.getDependsOn();
 				if (dependsOn != null) {
 					for (String dep : dependsOn) {
 						getBean(dep);
 					}
 				}
+
+				// 异步创建Bean
 				CompletableFuture<?> future = CompletableFuture.runAsync(
 						() -> instantiateSingletonInBackgroundThread(beanName), executor);
+
+				// 添加到三级缓存，出现循环依赖的时候就会阻塞了
 				addSingletonFactory(beanName, () -> {
 					try {
 						future.join();
@@ -1182,6 +1193,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 		}
 
+		// 默认情况下还是走的这里，直接在当前线程上进行创建
 		if (!mbd.isLazyInit()) {
 			try {
 				instantiateSingleton(beanName);
@@ -1211,9 +1223,14 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	}
 
 	private void instantiateSingleton(String beanName) {
+		// 根据beanName判断是不是FactoryBean，会根据beanName找到BeanDefinition，从而找到对应类型，从而进行判断
 		if (isFactoryBean(beanName)) {
+			// 创建FactoryBean本身，先创建MyFactoryBean对象
 			Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
+
+			// 创建FactoryBean中getObject()方法返回的Bean
 			if (bean instanceof SmartFactoryBean<?> smartFactoryBean && smartFactoryBean.isEagerInit()) {
+				// 调用MyFactoryBean对象的getObject()
 				getBean(beanName);
 			}
 		}
