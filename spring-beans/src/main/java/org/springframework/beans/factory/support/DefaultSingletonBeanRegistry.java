@@ -789,6 +789,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		Set<String> dependentBeanNames;
 		synchronized (this.dependentBeanMap) {
 			// Within full synchronization in order to guarantee a disconnected Set
+			// 找出beanName被哪些其它bean依赖了，先销毁其它这些bean
 			dependentBeanNames = this.dependentBeanMap.remove(beanName);
 		}
 		if (dependentBeanNames != null) {

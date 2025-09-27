@@ -1128,6 +1128,8 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					}
 				}
 			}
+
+			// 阻塞等待所有非懒加载的单例Bean创建完成
 			if (!futures.isEmpty()) {
 				try {
 					CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])).join();
@@ -1143,6 +1145,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 
 		// Trigger post-initialization callback for all applicable beans...
+		// 执行所有SmartInitializingSingleton的afterSingletonsInstantiated()
 		for (String beanName : beanNames) {
 			Object singletonInstance = getSingleton(beanName, false);
 			if (singletonInstance instanceof SmartInitializingSingleton smartSingleton) {
@@ -1156,7 +1159,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 	@Nullable
 	private CompletableFuture<?> preInstantiateSingleton(String beanName, RootBeanDefinition mbd) {
-		// 默认为false
+		// 默认为false（是否支持异步创建）
 		if (mbd.isBackgroundInit()) {
 			// 线程池
 			Executor executor = getBootstrapExecutor();
@@ -1176,6 +1179,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 						() -> instantiateSingletonInBackgroundThread(beanName), executor);
 
 				// 添加到三级缓存，出现循环依赖的时候就会阻塞了
+				// 有bug，当一个Bean在创建时，发现单例池中没有，但是自己正在创建过程中，应该要等另外的线程创建完，而不是等自己
 				addSingletonFactory(beanName, () -> {
 					try {
 						future.join();
@@ -1185,6 +1189,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					}
 					return future;  // not to be exposed, just to lead to ClassCastException in case of mismatch
 				});
+
 				return (!mbd.isLazyInit() ? future : null);
 			}
 			else if (logger.isInfoEnabled()) {

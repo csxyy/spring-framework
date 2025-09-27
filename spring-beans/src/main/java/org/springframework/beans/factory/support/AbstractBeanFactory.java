@@ -1617,7 +1617,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	private Class<?> doResolveBeanClass(RootBeanDefinition mbd, Class<?>... typesToMatch)
 			throws ClassNotFoundException {
 
+		// Spring中ClassLoader的获取方式
 		ClassLoader beanClassLoader = getBeanClassLoader();
+
 		ClassLoader dynamicLoader = beanClassLoader;
 		boolean freshResolve = false;
 
@@ -2141,7 +2143,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	 * @since 5.3
 	 */
 	static class BeanPostProcessorCache {
-
+		// 多了实例化前后方法
 		final List<InstantiationAwareBeanPostProcessor> instantiationAware = new ArrayList<>();
 
 		final List<SmartInstantiationAwareBeanPostProcessor> smartInstantiationAware = new ArrayList<>();

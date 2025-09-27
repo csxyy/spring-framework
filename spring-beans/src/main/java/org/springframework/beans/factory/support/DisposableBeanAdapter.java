@@ -411,14 +411,18 @@ class DisposableBeanAdapter implements DisposableBean, Runnable, Serializable {
 	 */
 	@Nullable
 	static String[] inferDestroyMethodsIfNecessary(Class<?> target, RootBeanDefinition beanDefinition) {
+
 		String[] destroyMethodNames = beanDefinition.getDestroyMethodNames();
+
 		if (destroyMethodNames != null && destroyMethodNames.length > 1) {
 			return destroyMethodNames;
 		}
 
 		String destroyMethodName = beanDefinition.resolvedDestroyMethodName;
 		if (destroyMethodName == null) {
+
 			destroyMethodName = beanDefinition.getDestroyMethodName();
+
 			boolean autoCloseable = AutoCloseable.class.isAssignableFrom(target);
 			boolean executorService = ExecutorService.class.isAssignableFrom(target);
 			if (AbstractBeanDefinition.INFER_METHOD.equals(destroyMethodName) ||
