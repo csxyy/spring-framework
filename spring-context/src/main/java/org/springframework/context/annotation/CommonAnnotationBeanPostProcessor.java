@@ -309,7 +309,10 @@ public class CommonAnnotationBeanPostProcessor extends InitDestroyAnnotationBean
 
 	@Override
 	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
+		// 去找@PostConstruct、@PreDestroy的方法
 		super.postProcessMergedBeanDefinition(beanDefinition, beanType, beanName);
+
+		// 找注入点
 		InjectionMetadata metadata = findResourceMetadata(beanName, beanType, null);
 		metadata.checkConfigMembers(beanDefinition);
 	}
@@ -437,6 +440,7 @@ public class CommonAnnotationBeanPostProcessor extends InitDestroyAnnotationBean
 					currElements.add(new EjbRefElement(field, field, null));
 				}
 				else if (jakartaResourceType != null && field.isAnnotationPresent(jakartaResourceType)) {
+					// 静态属性直接报错
 					if (Modifier.isStatic(field.getModifiers())) {
 						throw new IllegalStateException("@Resource annotation is not supported on static fields");
 					}

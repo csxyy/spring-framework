@@ -291,6 +291,7 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 	@Override
 	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
 		// Register externally managed config members on bean definition.
+		// 寻找并缓存注入点
 		findInjectionMetadata(beanName, beanType, beanDefinition);
 
 		// Use opportunity to clear caches which are not needed after singleton instantiation.
@@ -554,7 +555,10 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 					if (metadata != null) {
 						metadata.clear(pvs);
 					}
+
+					// 生成InjectionMetadata并缓存（InjectionMetadata 一个类的所有注入点）
 					metadata = buildAutowiringMetadata(clazz);
+
 					this.injectionMetadataCache.put(cacheKey, metadata);
 				}
 			}
@@ -563,6 +567,8 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 	}
 
 	private InjectionMetadata buildAutowiringMetadata(Class<?> clazz) {
+
+		// 判断 clazz 是不是String（java. 开头）
 		if (!AnnotationUtils.isCandidateClass(clazz, this.autowiredAnnotationTypes)) {
 			return InjectionMetadata.EMPTY;
 		}
@@ -570,36 +576,56 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 		final List<InjectionMetadata.InjectedElement> elements = new ArrayList<>();
 		Class<?> targetClass = clazz;
 
+		// 先找当前类中的注入点，再找父亲中的注入点
 		do {
 			final List<InjectionMetadata.InjectedElement> fieldElements = new ArrayList<>();
+
+			// 遍历类中的每个属性
 			ReflectionUtils.doWithLocalFields(targetClass, field -> {
+
+				// 属性上的@Autowired或@Value注解，两者都存在则返回@Autowired
 				MergedAnnotation<?> ann = findAutowiredAnnotation(field);
 				if (ann != null) {
+
+					// 不支持静态属性的注入
 					if (Modifier.isStatic(field.getModifiers())) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation is not supported on static fields: " + field);
 						}
 						return;
 					}
+
+					// 是否必须注入值
 					boolean required = determineRequiredStatus(ann);
+
+					// 添加属性注入点
 					fieldElements.add(new AutowiredFieldElement(field, required));
 				}
 			});
 
 			final List<InjectionMetadata.InjectedElement> methodElements = new ArrayList<>();
+
+			// 遍历类中的每个方法
 			ReflectionUtils.doWithLocalMethods(targetClass, method -> {
+
 				Method bridgedMethod = BridgeMethodResolver.findBridgedMethod(method);
 				if (!BridgeMethodResolver.isVisibilityBridgeMethodPair(method, bridgedMethod)) {
 					return;
 				}
+
+				// 方法上的@Autowired或@Value注解，两者都存在则返回@Autowired
 				MergedAnnotation<?> ann = findAutowiredAnnotation(bridgedMethod);
 				if (ann != null && method.equals(ClassUtils.getMostSpecificMethod(method, clazz))) {
+
+					// 不支持静态方法注入
 					if (Modifier.isStatic(method.getModifiers())) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation is not supported on static methods: " + method);
 						}
 						return;
 					}
+
+					// 方法没有参数不会注入，但是会执行
 					if (method.getParameterCount() == 0) {
 						if (method.getDeclaringClass().isRecord()) {
 							// Annotations on the compact constructor arguments made available on accessors, ignoring.
@@ -610,14 +636,21 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 									method);
 						}
 					}
+
 					boolean required = determineRequiredStatus(ann);
 					PropertyDescriptor pd = BeanUtils.findPropertyForMethod(bridgedMethod, clazz);
+
+					// 添加方法注入点
 					methodElements.add(new AutowiredMethodElement(method, required, pd));
 				}
 			});
 
+			// 父类的注入点会排在子类的注入点前面，因此依赖注入时会先对父类中的属性进行注入
+			// sortMethodElements的作用是方法注入点按字节码中的方法定义顺序重新排序
 			elements.addAll(0, sortMethodElements(methodElements, targetClass));
 			elements.addAll(0, fieldElements);
+
+			// 取父类
 			targetClass = targetClass.getSuperclass();
 		}
 		while (targetClass != null && targetClass != Object.class);
@@ -660,6 +693,8 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 			// Try reading the class file via ASM for deterministic declaration order...
 			// Unfortunately, the JVM's standard reflection returns methods in arbitrary
 			// order, even between different runs of the same application on the same JVM.
+			// 上面注释的意思是，利用JVM的反射机制获得的方法顺序是任意的，即使相同应用在相同JVM上运行两次
+			// 因此需要利用ASM解析字节码得到方法的定义顺序
 			try {
 				AnnotationMetadata asm =
 						this.metadataReaderFactory.getMetadataReader(targetClass.getName()).getAnnotationMetadata();
@@ -667,7 +702,11 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 				if (asmMethods.size() >= methodElements.size()) {
 					List<InjectionMetadata.InjectedElement> candidateMethods = new ArrayList<>(methodElements);
 					List<InjectionMetadata.InjectedElement> selectedMethods = new ArrayList<>(asmMethods.size());
+
+					// 遍历ASM的解析结果
 					for (MethodMetadata asmMethod : asmMethods) {
+
+						// 根据asmMethod找到对应的方法注入点，并添加到selectedMethods中，这样selectedMethods中的方法注入点就是按字节码顺序
 						for (Iterator<InjectionMetadata.InjectedElement> it = candidateMethods.iterator(); it.hasNext();) {
 							InjectionMetadata.InjectedElement element = it.next();
 							if (element.getMember().getName().equals(asmMethod.getMethodName())) {
@@ -767,8 +806,11 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 				}
 			}
 			else {
+				// 根据属性field的类型和名字从容器中找到对应Bean对象
 				value = resolveFieldValue(field, bean, beanName);
 			}
+
+			// 反射赋值
 			if (value != null) {
 				ReflectionUtils.makeAccessible(field);
 				field.set(bean, value);
@@ -831,9 +873,11 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 
 		@Override
 		protected void inject(Object bean, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
+
 			if (!shouldInject(pvs)) {
 				return;
 			}
+
 			Method method = (Method) this.member;
 			Object[] arguments;
 			if (this.cached) {
@@ -848,8 +892,11 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 				}
 			}
 			else {
+				// 根据方法每个参数的类型和名字找到对应的Bean对象
 				arguments = resolveMethodArguments(method, bean, beanName);
 			}
+
+			// 反射执行方法
 			if (arguments != null) {
 				try {
 					ReflectionUtils.makeAccessible(method);
@@ -881,13 +928,21 @@ public class AutowiredAnnotationBeanPostProcessor implements SmartInstantiationA
 			Set<String> autowiredBeanNames = CollectionUtils.newLinkedHashSet(argumentCount);
 			Assert.state(beanFactory != null, "No BeanFactory available");
 			TypeConverter typeConverter = beanFactory.getTypeConverter();
+
+			// 遍历每个方法参数
 			for (int i = 0; i < arguments.length; i++) {
 				MethodParameter methodParam = new MethodParameter(method, i);
+
 				DependencyDescriptor currDesc = new DependencyDescriptor(methodParam, this.required);
+
 				currDesc.setContainingClass(bean.getClass());
 				descriptors[i] = currDesc;
+
 				try {
+					// 根据currDesc，一个currDesc对应一个方法参数，从容器找Bean
+					// 传进去的autowiredBeanNames会记录对应Bean的beanName
 					Object arg = beanFactory.resolveDependency(currDesc, beanName, autowiredBeanNames, typeConverter);
+
 					if (arg == null && !this.required && !methodParam.isOptional()) {
 						arguments = null;
 						break;

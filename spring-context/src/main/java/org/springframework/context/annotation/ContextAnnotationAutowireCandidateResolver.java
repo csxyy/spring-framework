@@ -50,6 +50,7 @@ public class ContextAnnotationAutowireCandidateResolver extends QualifierAnnotat
 	@Override
 	@Nullable
 	public Object getLazyResolutionProxyIfNecessary(DependencyDescriptor descriptor, @Nullable String beanName) {
+		// 如果加了@Lazy注解就直接返回一个代理对象
 		return (isLazy(descriptor) ? buildLazyResolutionProxy(descriptor, beanName) : null);
 	}
 
@@ -138,6 +139,8 @@ public class ContextAnnotationAutowireCandidateResolver extends QualifierAnnotat
 			}
 
 			Set<String> autowiredBeanNames = new LinkedHashSet<>(2);
+
+			// 进行依赖查找
 			Object target = this.beanFactory.doResolveDependency(
 					this.descriptor, this.beanName, autowiredBeanNames, null);
 

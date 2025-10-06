@@ -1650,24 +1650,31 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	public Object resolveDependency(DependencyDescriptor descriptor, @Nullable String requestingBeanName,
 			@Nullable Set<String> autowiredBeanNames, @Nullable TypeConverter typeConverter) throws BeansException {
 
+		// 方法参数名解析器
 		descriptor.initParameterNameDiscovery(getParameterNameDiscoverer());
+
+		// descriptor.getDependencyType()表示属性类型或方法参数类型
 		if (Optional.class == descriptor.getDependencyType()) {
 			return createOptionalDependency(descriptor, requestingBeanName);
 		}
 		else if (ObjectFactory.class == descriptor.getDependencyType() ||
 				ObjectProvider.class == descriptor.getDependencyType()) {
+			// 直接返回一个DependencyObjectProvider对象，调用getObject()时才会进行依赖查找
 			return new DependencyObjectProvider(descriptor, requestingBeanName);
 		}
 		else if (jakartaInjectProviderClass == descriptor.getDependencyType()) {
 			return new Jsr330Factory().createDependencyProvider(descriptor, requestingBeanName);
 		}
 		else if (descriptor.supportsLazyResolution()) {
+			// 处理@Lazy注解，返回一个代理对象
 			Object result = getAutowireCandidateResolver().getLazyResolutionProxyIfNecessary(
 					descriptor, requestingBeanName);
 			if (result != null) {
 				return result;
 			}
 		}
+
+		// 进行依赖查找
 		return doResolveDependency(descriptor, requestingBeanName, autowiredBeanNames, typeConverter);
 	}
 
@@ -1679,6 +1686,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		InjectionPoint previousInjectionPoint = ConstructorResolver.setCurrentInjectionPoint(descriptor);
 		try {
 			// Step 1: pre-resolved shortcut for single bean match, for example, from @Autowired
+			// 表示descriptor之前已经被注入过了，直接可以依赖查找的结果
 			Object shortcut = descriptor.resolveShortcut(this);
 			if (shortcut != null) {
 				return shortcut;
@@ -1687,14 +1695,22 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			Class<?> type = descriptor.getDependencyType();
 
 			// Step 2: pre-defined value or expression, for example, from @Value
+			// 处理@Value
+			// 先得到@Value中定义的字符串
 			Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);
 			if (value != null) {
 				if (value instanceof String strValue) {
+					// 先填充${}占位符
 					String resolvedValue = resolveEmbeddedValue(strValue);
+
 					BeanDefinition bd = (beanName != null && containsBean(beanName) ?
 							getMergedBeanDefinition(beanName) : null);
+
+					// 再执行${}Spring EL表达式
 					value = evaluateBeanDefinitionString(resolvedValue, bd);
 				}
+
+				// 将得到的结果转成descriptor对应的类型
 				TypeConverter converter = (typeConverter != null ? typeConverter : getTypeConverter());
 				try {
 					return converter.convertIfNecessary(value, type, descriptor.getTypeDescriptor());
@@ -1714,6 +1730,8 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					String suggestedName = getAutowireCandidateResolver().getSuggestedName(descriptor);
 					dependencyName = (suggestedName != null && containsBean(suggestedName) ? suggestedName : null);
 				}
+
+				// 属性名如果存在对应的Bean，则判断Bean的类型是否和属性类型匹配，如果匹配则继续判断Bean是否能用来做依赖注入
 				if (dependencyName != null) {
 					dependencyName = canonicalName(dependencyName);  // dependency name can be alias of target name
 					if (isTypeMatch(dependencyName, type) && isAutowireCandidate(dependencyName, descriptor) &&
@@ -1734,11 +1752,14 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 
 			// Step 4a: multiple beans as stream / array / standard collection / plain map
+			// 如果是集合类型，则根据类型找到多个bean，然后直接return
 			Object multipleBeans = resolveMultipleBeans(descriptor, beanName, autowiredBeanNames, typeConverter);
 			if (multipleBeans != null) {
 				return multipleBeans;
 			}
+
 			// Step 4b: direct bean matches, possibly direct beans of type Collection / Map
+			// 根据type找到多个bean beanDefinitionMap <beanName, BeanDefinition> beanClass
 			Map<String, Object> matchingBeans = findAutowireCandidates(beanName, type, descriptor);
 			if (matchingBeans.isEmpty()) {
 				// Step 4c (fallback): custom Collection / Map declarations for collecting multiple beans
@@ -1758,8 +1779,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 			// Step 5: determine single candidate
 			if (matchingBeans.size() > 1) {
+				// 从多个bean中进一步进行筛选
 				autowiredBeanName = determineAutowireCandidate(matchingBeans, descriptor);
+
 				if (autowiredBeanName == null) {
+					// 没找到但是又是必须的，就会抛异常
 					if (isRequired(descriptor) || !indicatesArrayCollectionOrMap(type)) {
 						// Raise exception if no clear match found for required injection point
 						return descriptor.resolveNotUnique(descriptor.getResolvableType(), matchingBeans);
@@ -1784,6 +1808,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			if (autowiredBeanNames != null) {
 				autowiredBeanNames.add(autowiredBeanName);
 			}
+
 			if (instanceCandidate instanceof Class) {
 				instanceCandidate = descriptor.resolveCandidate(autowiredBeanName, type, this);
 			}
@@ -1817,6 +1842,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		Class<?> type = descriptor.getDependencyType();
 
 		if (descriptor instanceof StreamDependencyDescriptor streamDependencyDescriptor) {
+			// 根据类型找到多个bean
 			Map<String, Object> matchingBeans = findAutowireCandidates(beanName, type, descriptor);
 			if (autowiredBeanNames != null) {
 				autowiredBeanNames.addAll(matchingBeans.keySet());
@@ -1839,6 +1865,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			if (componentType == null) {
 				return null;
 			}
+			// 根据类型找到多个bean
 			Map<String, Object> matchingBeans = findAutowireCandidates(beanName, componentType,
 					new MultiElementDescriptor(descriptor));
 			if (matchingBeans.isEmpty()) {
@@ -1890,6 +1917,8 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		if (elementType == null) {
 			return null;
 		}
+
+		// 根据类型找到多个bean
 		Map<String, Object> matchingBeans = findAutowireCandidates(beanName, elementType,
 				new MultiElementDescriptor(descriptor));
 		if (matchingBeans.isEmpty()) {
@@ -1922,6 +1951,8 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		if (valueType == null) {
 			return null;
 		}
+
+		// 根据类型找到多个bean
 		Map<String, Object> matchingBeans = findAutowireCandidates(beanName, valueType,
 				new MultiElementDescriptor(descriptor));
 		if (matchingBeans.isEmpty()) {
@@ -1984,8 +2015,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	protected Map<String, Object> findAutowireCandidates(
 			@Nullable String beanName, Class<?> requiredType, DependencyDescriptor descriptor) {
 
+		// 找到类型匹配的所有beanName
 		String[] candidateNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 				this, requiredType, true, descriptor.isEager());
+
+		// Spring容器启动时会往resolvableDependencies中添加值
 		Map<String, Object> result = CollectionUtils.newLinkedHashMap(candidateNames.length);
 		for (Map.Entry<Class<?>, Object> classObjectEntry : this.resolvableDependencies.entrySet()) {
 			Class<?> autowiringType = classObjectEntry.getKey();
@@ -1998,6 +2032,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 		}
+
+		// 如果不是自己注入自己，那么继续判断candidateNames这些beanName能不能用来注入
+		// 优先注入别人，只有一个才自己注入自己
 		for (String candidate : candidateNames) {
 			if (!isSelfReference(beanName, candidate) && isAutowireCandidate(candidate, descriptor)) {
 				addCandidateEntry(result, candidate, descriptor, requiredType);
@@ -2062,12 +2099,16 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	@Nullable
 	protected String determineAutowireCandidate(Map<String, Object> candidates, DependencyDescriptor descriptor) {
 		Class<?> requiredType = descriptor.getDependencyType();
+
 		// Step 1: check primary candidate
+		// 选择主Bean
 		String primaryCandidate = determinePrimaryCandidate(candidates, requiredType);
 		if (primaryCandidate != null) {
 			return primaryCandidate;
 		}
+
 		// Step 2a: match bean name against declared dependency name
+		// 根据属性名或方法名进行匹配
 		String dependencyName = descriptor.getDependencyName();
 		if (dependencyName != null) {
 			for (String beanName : candidates.keySet()) {
@@ -2076,7 +2117,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 		}
+
 		// Step 2b: match bean name against qualifier-suggested name
+		// 根据@Qualifier指定的name进行匹配
 		String suggestedName = getAutowireCandidateResolver().getSuggestedName(descriptor);
 		if (suggestedName != null) {
 			for (String beanName : candidates.keySet()) {
@@ -2085,17 +2128,22 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 		}
+
 		// Step 3: check highest priority candidate
+		// 选择优先级最高的，可以通过@Priority来定义优先级
 		String priorityCandidate = determineHighestPriorityCandidate(candidates, requiredType);
 		if (priorityCandidate != null) {
 			return priorityCandidate;
 		}
+
 		// Step 4: pick unique default-candidate
 		String defaultCandidate = determineDefaultCandidate(candidates);
 		if (defaultCandidate != null) {
 			return defaultCandidate;
 		}
+
 		// Step 5: pick directly registered dependency
+		// 在prepareBeanFactory()中往resolvableDependencies中添加了一些bean对象
 		for (Map.Entry<String, Object> entry : candidates.entrySet()) {
 			String candidateName = entry.getKey();
 			Object beanInstance = entry.getValue();
@@ -2118,6 +2166,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	protected String determinePrimaryCandidate(Map<String, Object> candidates, Class<?> requiredType) {
 		String primaryBeanName = null;
 		// First pass: identify unique primary candidate
+		// 找主bean
 		for (Map.Entry<String, Object> entry : candidates.entrySet()) {
 			String candidateBeanName = entry.getKey();
 			Object beanInstance = entry.getValue();
@@ -2138,7 +2187,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 		}
+
 		// Second pass: identify unique non-fallback candidate
+		// 没有主bean，找唯一的non-fallback bean
 		if (primaryBeanName == null) {
 			for (String candidateBeanName : candidates.keySet()) {
 				if (!isFallback(candidateBeanName)) {
@@ -2367,6 +2418,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	private Optional<?> createOptionalDependency(
 			DependencyDescriptor descriptor, @Nullable String beanName, final Object... args) {
 
+		// 重写isRequired为false
 		DependencyDescriptor descriptorToUse = new NestedDependencyDescriptor(descriptor) {
 			@Override
 			public boolean isRequired() {

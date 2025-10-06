@@ -1563,8 +1563,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 					MethodParameter methodParam = BeanUtils.getWriteMethodParameter(pd);
 					// Do not allow eager init for type matching in case of a prioritized post-processor.
 					boolean eager = !(bw.getWrappedInstance() instanceof PriorityOrdered);
+
 					DependencyDescriptor desc = new AutowireByTypeDependencyDescriptor(methodParam, eager);
 					Object autowiredArgument = resolveDependency(desc, beanName, autowiredBeanNames, converter);
+
 					if (autowiredArgument != null) {
 						pvs.add(propertyName, autowiredArgument);
 					}
