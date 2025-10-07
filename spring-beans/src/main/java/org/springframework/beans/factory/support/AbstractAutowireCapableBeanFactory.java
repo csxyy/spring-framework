@@ -1236,17 +1236,32 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 				}
 			}
 		}
+
+		// 已经知道了要用哪个构造方法
 		if (resolved) {
+			// autowireNecessary为true，表示已经缓存了构造方法的参数值
 			if (autowireNecessary) {
+				// 进入构造方法注入，不过其实已经缓存好了参数值了，不需要在根据参数去找Bean
 				return autowireConstructor(beanName, mbd, null, null);
 			}
 			else {
+				// autowireNecessary为false，表示缓存的构造方法为无参构造方法
 				return instantiateBean(beanName, mbd);
 			}
 		}
 
+		// 不知道要用哪个构造方法，根据@Autowired注解来选择
 		// Candidate constructors for autowiring?
+
+		// 1. 返回加了@Autowired注解的构造方法 (1 true, 多 false + 无参构造)
+		// 2. null，多个---
+		// 3. 1
 		Constructor<?>[] ctors = determineConstructorsFromBeanPostProcessors(beanClass, beanName);
+
+		// 如果ctors != null，其实表示的是上一步找到了多个构造方法，接下来要继续进行推断，并进行构造方法注入
+		// 不管上一步根据@Autowired找没找到构造方法，如果autowireMode为AUTOWIRE_CONSTRUCTOR，那么都会继续进行推断，并进行构造方法注入
+		// 如果BeanDefinition中指定了构造方法参数值，那么直接根据指定的参数值匹配构造方法，并将指定的参数值传给构造方法
+		// 如果getBean()方法中指定了构造方法参数值，那么直接根据指定的参数值匹配构造方法，并将指定的参数值传给构造方法
 		if (ctors != null || mbd.getResolvedAutowireMode() == AUTOWIRE_CONSTRUCTOR ||
 				mbd.hasConstructorArgumentValues() || !ObjectUtils.isEmpty(args)) {
 			return autowireConstructor(beanName, mbd, ctors, args);
@@ -1259,6 +1274,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		}
 
 		// No special handling: simply use no-arg constructor.
+		// 如果到了这一步，那就直接用无参构造方法来实例化得到对象了
 		return instantiateBean(beanName, mbd);
 	}
 
