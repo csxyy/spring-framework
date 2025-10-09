@@ -93,7 +93,7 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 */
 	public AnnotationConfigApplicationContext(Class<?>... componentClasses) {
 		this();
-		register(componentClasses);	//注册（只生成componentClasses的BeanDefinition对象）
+		register(componentClasses);	// 生成componentClasses的BeanDefinition对象并存到beanDefinitionMap里
 		refresh();	//容器刷新
 	}
 

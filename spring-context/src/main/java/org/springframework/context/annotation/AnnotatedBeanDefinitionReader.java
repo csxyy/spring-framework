@@ -84,8 +84,20 @@ public class AnnotatedBeanDefinitionReader {
 	public AnnotatedBeanDefinitionReader(BeanDefinitionRegistry registry, Environment environment) {
 		Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
 		Assert.notNull(environment, "Environment must not be null");
+
+		// BeanDefinitionRegistry是用来注册Bean的
 		this.registry = registry;
+
+		// ConditionEvaluator是用来处理@Condition注解的
 		this.conditionEvaluator = new ConditionEvaluator(registry, environment, null);
+
+		// 会注册一些PostProcessor，包括：
+		// ConfigurationClassPostProcessor
+		// AutowiredAnnotationBeanPostProcessor
+		// CommonAnnotationBeanPostProcessor
+		// PersistenceAnnotationBeanPostProcessor
+		// EventListenerMethodProcessor
+		// DefaultEventListenerFactory
 		AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);
 	}
 
@@ -296,6 +308,8 @@ public class AnnotatedBeanDefinitionReader {
 
 		BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(abd, beanName);
 		definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+
+		// 将BeanDefinition注册到BeanDefinitionRegistry中
 		BeanDefinitionReaderUtils.registerBeanDefinition(definitionHolder, this.registry);
 	}
 
