@@ -179,6 +179,7 @@ public class EventListenerMethodProcessor
 			}
 			else {
 				// Non-empty set of methods
+				// 存在加了@EventListener注解的方法
 				ConfigurableApplicationContext context = this.applicationContext;
 				Assert.state(context != null, "No ApplicationContext set");
 				List<EventListenerFactory> factories = this.eventListenerFactories;

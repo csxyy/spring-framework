@@ -555,6 +555,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * to the internal BeanFactory.
 	 */
 	public List<BeanFactoryPostProcessor> getBeanFactoryPostProcessors() {
+		// 这里拿到的是程序员自己 ioc.addBeanFactoryPostProcessor(xxx); 容器刷新前 （很少这么用）
 		return this.beanFactoryPostProcessors;
 	}
 
@@ -614,11 +615,12 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 
 				// 执行BeanDefinitionRegistryPostProcessor和BeanFactoryPostProcessor
 				// 默认提供了ConfigurationClassPostProcessor，所以会触发配置类的解析，从而触发扫描
+				// @ComponentScan @Import @Bean ---> BeanDefinition
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
 				// 上一步会进行扫描或其它方式注册BeanDefinition，这一步从中找出BeanPostProcessor进行创建并添加到BeanFactory中
-				registerBeanPostProcessors(beanFactory);
+				registerBeanPostProcessors(beanFactory);	// beanPostProcessorsList
 				beanPostProcess.end();
 
 				// Initialize message source for this context.
@@ -806,6 +808,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * <p>Must be called before singleton instantiation.
 	 */
 	protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory beanFactory) {
+		// 可以直接利用ApplicationContext来注册BeanFactoryPostProcessor
 		PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());
 
 		// Detect a LoadTimeWeaver and prepare for weaving, if found in the meantime
