@@ -365,6 +365,7 @@ class ConfigurationClassParser {
 		}
 
 		// Process any @Import annotations
+		// getImports(sourceClass) == 通过@Import导入的所有类
 		processImports(configClass, sourceClass, getImports(sourceClass), filter, true);
 
 		// Process any @ImportResource annotations
@@ -417,7 +418,7 @@ class ConfigurationClassParser {
 			Predicate<String> filter) throws IOException {
 
 		Collection<SourceClass> memberClasses = sourceClass.getMemberClasses();
-		if (!memberClasses.isEmpty()) {
+		if (!memberClasses.isEmpty()) {	// 拿到的内部类是否存在
 			List<SourceClass> candidates = new ArrayList<>(memberClasses.size());
 			for (SourceClass memberClass : memberClasses) {
 				if (ConfigurationClassUtils.isConfigurationCandidate(memberClass.getMetadata()) &&
@@ -584,6 +585,7 @@ class ConfigurationClassParser {
 			return;
 		}
 
+		// 不能循环导入
 		if (checkForCircularImports && isChainedImportOnStack(configClass)) {
 			this.problemReporter.error(new CircularImportProblem(configClass, this.importStack));
 		}
@@ -623,6 +625,7 @@ class ConfigurationClassParser {
 						// process it as an @Configuration class
 						this.importStack.registerImport(
 								currentSourceClass.getMetadata(), candidate.getMetadata().getClassName());
+
 						processConfigurationClass(candidate.asConfigClass(configClass), filter);
 					}
 				}

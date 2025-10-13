@@ -143,13 +143,18 @@ public abstract class ConfigurationClassUtils {
 			}
 		}
 
+		// 存在@Configuration注解
 		Map<String, Object> config = metadata.getAnnotationAttributes(Configuration.class.getName());
+		// proxyBeanMethods为true或null，就是FULL
 		if (config != null && !Boolean.FALSE.equals(config.get("proxyBeanMethods"))) {
-			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_FULL);
+			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_FULL);	// FULL 全配置类
 		}
+		// proxyBeanMethods为false，就是LITE
+		// 或者没有@Configuration，但是有@Component、@ComponentScan、@Import、@ImportResource、@Bean也是LITE
+		// SpringBoot中的自动配置类很多都是LITE
 		else if (config != null || Boolean.TRUE.equals(beanDef.getAttribute(CANDIDATE_ATTRIBUTE)) ||
 				isConfigurationCandidate(metadata)) {
-			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_LITE);
+			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_LITE);	// LITE 轻配置类
 		}
 		else {
 			return false;

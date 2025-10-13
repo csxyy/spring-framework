@@ -270,6 +270,7 @@ public class AnnotatedBeanDefinitionReader {
 			return;
 		}
 
+		// 通过ioc.register进来的类就是一个配置类
 		abd.setAttribute(ConfigurationClassUtils.CANDIDATE_ATTRIBUTE, Boolean.TRUE);
 		abd.setInstanceSupplier(supplier);
 
