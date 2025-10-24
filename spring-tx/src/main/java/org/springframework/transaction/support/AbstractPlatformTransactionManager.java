@@ -402,6 +402,7 @@ public abstract class AbstractPlatformTransactionManager
 				logger.debug("Creating new transaction with name [" + def.getName() + "]: " + def);
 			}
 			try {
+				// 开启Spring事务
 				return startTransaction(def, transaction, false, debugEnabled, suspendedResources);
 			}
 			catch (RuntimeException | Error ex) {
@@ -529,7 +530,7 @@ public abstract class AbstractPlatformTransactionManager
 				definition, transaction, true, newSynchronization, nested, debugEnabled, suspendedResources);
 		this.transactionExecutionListeners.forEach(listener -> listener.beforeBegin(status));
 		try {
-			doBegin(transaction, definition);
+			doBegin(transaction, definition);	// 核心
 		}
 		catch (RuntimeException | Error ex) {
 			this.transactionExecutionListeners.forEach(listener -> listener.afterBegin(status, ex));
@@ -739,6 +740,9 @@ public abstract class AbstractPlatformTransactionManager
 		}
 
 		DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
+
+		// 可以通过TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+		// 相当于强制回滚
 		if (defStatus.isLocalRollbackOnly()) {
 			if (defStatus.isDebug()) {
 				logger.debug("Transactional code has requested rollback");
@@ -755,6 +759,7 @@ public abstract class AbstractPlatformTransactionManager
 			return;
 		}
 
+		// 这里才会真正提交
 		processCommit(defStatus);
 	}
 

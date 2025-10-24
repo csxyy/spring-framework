@@ -83,6 +83,7 @@ public enum Propagation {
 	 * Execute non-transactionally, throw an exception if a transaction exists.
 	 * Analogous to EJB transaction attribute of the same name.
 	 */
+	// 以非事务方式执行，如果事务存在（上游），则抛出异常
 	NEVER(TransactionDefinition.PROPAGATION_NEVER),
 
 	/**
