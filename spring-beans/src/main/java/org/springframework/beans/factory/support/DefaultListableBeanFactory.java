@@ -192,6 +192,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	private final Map<Class<?>, Object> resolvableDependencies = new ConcurrentHashMap<>(16);
 
 	/** Map of bean definition objects, keyed by bean name. */
+	// 核心：BeanDefinition存储Map
 	private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>(256);
 
 	/** Map from bean name to merged BeanDefinitionHolder. */
@@ -207,9 +208,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	private final Map<Class<?>, String[]> singletonBeanNamesByType = new ConcurrentHashMap<>(64);
 
 	/** List of bean definition names, in registration order. */
+	// BeanDefinition名称列表（按注册顺序）
 	private volatile List<String> beanDefinitionNames = new ArrayList<>(256);
 
 	/** List of names of manually registered singletons, in registration order. */
+	// 手动注入的单例Bean名称（非BeanDefinition创建的）
 	private volatile Set<String> manualSingletonNames = new LinkedHashSet<>(16);
 
 	/** Cached array of bean definition names in case of frozen configuration. */
@@ -1258,34 +1261,39 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	@Override
 	public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
 			throws BeanDefinitionStoreException {
-
+		// 1.参数校验
 		Assert.hasText(beanName, "Bean name must not be empty");
 		Assert.notNull(beanDefinition, "BeanDefinition must not be null");
 
+		// 2.验证BeanDefinition
 		if (beanDefinition instanceof AbstractBeanDefinition abd) {
 			try {
 				abd.validate();
 			}
 			catch (BeanDefinitionValidationException ex) {
+				// 验证失败处理
 				throw new BeanDefinitionStoreException(beanDefinition.getResourceDescription(), beanName,
 						"Validation of bean definition failed", ex);
 			}
 		}
 
 		// 判断beanName是否存在
+		// 3.检查是否已经存在同名的BeanDefinition
 		BeanDefinition existingDefinition = this.beanDefinitionMap.get(beanName);
 		if (existingDefinition != null) {
-
 			// 看BeanFactory的allowBeanDefinitionOverriding配置是否为false，表示不允许覆盖
+			// 已存在时的处理逻辑（覆盖、抛异常等）
 			if (!isBeanDefinitionOverridable(beanName)) {
 				throw new BeanDefinitionOverrideException(beanName, beanDefinition, existingDefinition);
 			}
 			else {
 				// 打Bean覆盖的日志而已
+				// 日志记录覆盖操作
 				logBeanDefinitionOverriding(beanName, beanDefinition, existingDefinition);
 			}
 
 			// 允许覆盖就直接覆盖
+			// 4.注册到Map中
 			this.beanDefinitionMap.put(beanName, beanDefinition);
 		}
 		else {

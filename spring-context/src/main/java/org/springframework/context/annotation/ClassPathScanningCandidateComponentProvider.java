@@ -349,10 +349,12 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @return a corresponding Set of autodetected bean definitions
 	 */
 	public Set<BeanDefinition> findCandidateComponents(String basePackage) {
+		// 策略选择：如果存在组件索引(componentsIndex)且支持包含过滤器，使用索引扫描（更快）
 		if (this.componentsIndex != null && indexSupportsIncludeFilters()) {
 			return addCandidateComponentsFromIndex(this.componentsIndex, basePackage);
 		}
 		else {
+			// 回退策略：使用传统的类路径扫描（兼容性更好）
 			return scanCandidateComponents(basePackage);
 		}
 	}
@@ -454,18 +456,26 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 		return candidates;
 	}
 
-	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {	//包路径会传进来
+	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
+			// 第一步：构建类路径搜索模式
+			// 将包名转换为类路径搜索模式，如：com.it  ->  classpath*:com/it/**/*.class
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
 
-			// .class文件对应的Resource对象
+			// 第二步：获取所有.class文件资源
+			// 扫描类路径，找到所有匹配的.class文件（封装到Resource对象里）
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
+
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
+
+			// 第三步：遍历所有资源文件
 			for (Resource resource : resources) {
 				String filename = resource.getFilename();
+
+				// 过滤1：忽略CGLIB生成的代理类
 				if (filename != null && filename.contains(ClassUtils.CGLIB_CLASS_SEPARATOR)) {
 					// Ignore CGLIB-generated classes in the classpath
 					continue;
@@ -475,14 +485,19 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 				}
 
 				try {
+					// 第四步：使用ASM技术解析类元数据
 					// 利用ASM技术解析每个.class文件得到类的各种信息（类的元数据信息）
 					MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
 
+					// 第五步：应用过滤器判断是否为候选组件
 					// 利用excludeFilters和includeFilters来判断当前class是否为bean，条件注解
 					if (isCandidateComponent(metadataReader)) {
+
+						// 第六步：创建BeanDefinition
 						ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 						sbd.setSource(resource);
 
+						// 第七步：二次验证：检查类是否可实例化
 						// 不能是接口或抽象类，如果是抽象类，但是有@Lookup注解的方法则通过
 						if (isCandidateComponent(sbd)) {
 							if (debugEnabled) {
@@ -503,11 +518,13 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 					}
 				}
 				catch (FileNotFoundException ex) {
+					// 文件不存在，忽略（可能是动态路径变化
 					if (traceEnabled) {
 						logger.trace("Ignored non-readable " + resource + ": " + ex.getMessage());
 					}
 				}
 				catch (ClassFormatException ex) {
+					// 类格式异常处理
 					if (shouldIgnoreClassFormatException) {
 						if (debugEnabled) {
 							logger.debug("Ignored incompatible class format in " + resource + ": " + ex.getMessage());

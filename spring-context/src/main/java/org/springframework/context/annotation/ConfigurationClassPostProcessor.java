@@ -276,18 +276,22 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	 */
 	@Override
 	public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
+		// 核心逻辑：生成注册表的唯一标识（基于对象内存地址）
 		int registryId = System.identityHashCode(registry);
+		// 安全检查：防止重复调用postProcessBeanDefinitionRegistry
 		if (this.registriesPostProcessed.contains(registryId)) {
 			throw new IllegalStateException(
 					"postProcessBeanDefinitionRegistry already called on this post-processor against " + registry);
 		}
+		// 安全检查：防止错误的调用顺序（必须先调用postProcessBeanDefinitionRegistry再调postProcessBeanFactory）
 		if (this.factoriesPostProcessed.contains(registryId)) {
 			throw new IllegalStateException(
 					"postProcessBeanFactory already called on this post-processor against " + registry);
 		}
+		// 状态记录：标记注册表以及被处理
 		this.registriesPostProcessed.add(registryId);
 
-		// 解析配置类
+		// ⭐核心方法：解析配置类 执行配置类Bean定义的解析和处理
 		processConfigBeanDefinitions(registry);
 	}
 
@@ -361,31 +365,40 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	/**
 	 * Build and validate a configuration model based on the registry of
 	 * {@link Configuration} classes.
+	 *
+	 * 配置类解析的完整流程，负责识别、解析、处理所有配置类，
+	 * 包括包扫描、@Bean方法解析、@Import处理等，最终将所有这些转换为BeanDefinition注册到容器中。
 	 */
 	public void processConfigBeanDefinitions(BeanDefinitionRegistry registry) {
+		// 第一阶段：找出所有配置类候选者
 		List<BeanDefinitionHolder> configCandidates = new ArrayList<>();
 		String[] candidateNames = registry.getBeanDefinitionNames();
 
+		// 遍历所有Bean定义，找出配置类
 		// 找出Spring容器中的配置Bean
 		for (String beanName : candidateNames) {
 			BeanDefinition beanDef = registry.getBeanDefinition(beanName);
 			if (beanDef.getAttribute(ConfigurationClassUtils.CONFIGURATION_CLASS_ATTRIBUTE) != null) {
+				// 如果已经标记我为配置类，跳过（避免重复处理）
 				if (logger.isDebugEnabled()) {
 					logger.debug("Bean definition has already been processed as a configuration class: " + beanDef);
 				}
 			}
-			// 判断某个Bean是不是配置Bean
+			// ⭐核心判断：检查Bean定义是否为配置类候选者
+			// 使用 checkConfigurationClassCandidate() 判断某个Bean是否为配置类
 			else if (ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory)) {
 				configCandidates.add(new BeanDefinitionHolder(beanDef, beanName));
 			}
 		}
 
 		// Return immediately if no @Configuration classes were found
+		// 如果没有找到配置类，直接返回
 		if (configCandidates.isEmpty()) {
 			return;
 		}
 
 		// Sort by previously determined @Order value, if applicable
+		// 第二阶段：对配置类排序
 		// 对配置Bean按@Order注解进行排序，升序排序
 		configCandidates.sort((bd1, bd2) -> {
 			int i1 = ConfigurationClassUtils.getOrder(bd1.getBeanDefinition());
@@ -394,6 +407,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		});
 
 		// Detect any custom bean name generation strategy supplied through the enclosing application context
+		// 第三阶段：初始化环境配置和Bean名称生成器
 		SingletonBeanRegistry singletonRegistry = null;
 		if (registry instanceof SingletonBeanRegistry sbr) {
 			singletonRegistry = sbr;
@@ -412,6 +426,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 
 		// Parse each @Configuration class
+		// 第四阶段：创建配置类解析器（核心组件）
 		// 配置类解析器
 		ConfigurationClassParser parser = new ConfigurationClassParser(
 				this.metadataReaderFactory, this.problemReporter, this.environment,
@@ -419,30 +434,36 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 		Set<BeanDefinitionHolder> candidates = new LinkedHashSet<>(configCandidates);
 		Set<ConfigurationClass> alreadyParsed = CollectionUtils.newHashSet(configCandidates.size());
+
+		// 第五阶段：循环解析配置类（可能产生新的配置类）
 		do {
 			StartupStep processConfig = this.applicationStartup.start("spring.context.config-classes.parse");
 
-			// 解析所有配置类
+			// ⭐核心：解析所有配置类：处理@Configuration、@ComponentScan、@Bean、@Import等
+			// 注意：这里@Bean这种方法组件会延迟注册（BeanDefinition）
 			parser.parse(candidates);
 			parser.validate();
 
+			// 获取解析结果
 			Set<ConfigurationClass> configClasses = new LinkedHashSet<>(parser.getConfigurationClasses());
 			configClasses.removeAll(alreadyParsed);
 
 			// Read the model and create bean definitions based on its content
+			// 第六阶段：创建Bean定义读取器（将配置类转换成BeanDefinition）
 			if (this.reader == null) {
 				this.reader = new ConfigurationClassBeanDefinitionReader(
 						registry, this.sourceExtractor, this.resourceLoader, this.environment,
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
 
-			// 真正将@Bean方法解析为BeanDefinition在这里
+			// ⭐核心转换：真正将@Bean方法、@Import等解析(转换)为BeanDefinition并注册到容器
 			this.reader.loadBeanDefinitions(configClasses);
 
-			// 记录哪些配置类已经解析过了
+			// 记录已解析的配置类
 			alreadyParsed.addAll(configClasses);
 			processConfig.tag("classCount", () -> String.valueOf(configClasses.size())).end();
 
+			// 第七阶段：检查是否有新注册的配置类（循环处理）
 			candidates.clear();
 			if (registry.getBeanDefinitionCount() > candidateNames.length) {
 				String[] newCandidateNames = registry.getBeanDefinitionNames();
@@ -452,6 +473,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 					alreadyParsedClasses.add(configurationClass.getMetadata().getClassName());
 				}
 
+				// 检查新注册的Bean定义，找出未解析的配置类
 				// 再次遍历容器中的所有配置类，过滤出还没有解析过的配置类，继续进行解析
 				for (String candidateName : newCandidateNames) {
 					if (!oldCandidateNames.contains(candidateName)) {
@@ -465,16 +487,19 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 				candidateNames = newCandidateNames;
 			}
 		}
-		while (!candidates.isEmpty());
+		while (!candidates.isEmpty());	// 循环直到没有新的配置类
 
 		// Register the ImportRegistry as a bean in order to support ImportAware @Configuration classes
+		// 第八阶段：注册ImportRegistry等收尾工作
 		if (singletonRegistry != null && !singletonRegistry.containsSingleton(IMPORT_REGISTRY_BEAN_NAME)) {
 			singletonRegistry.registerSingleton(IMPORT_REGISTRY_BEAN_NAME, parser.getImportRegistry());
 		}
 
 		// Store the PropertySourceDescriptors to contribute them Ahead-of-time if necessary
+		// 存储属性源描述符
 		this.propertySourceDescriptors = parser.getPropertySourceDescriptors();
 
+		// 清理缓存
 		if (this.metadataReaderFactory instanceof CachingMetadataReaderFactory cachingMetadataReaderFactory) {
 			// Clear cache in externally provided MetadataReaderFactory; this is a no-op
 			// for a shared cache since it'll be cleared by the ApplicationContext.

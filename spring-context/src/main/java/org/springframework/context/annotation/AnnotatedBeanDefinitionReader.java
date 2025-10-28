@@ -91,13 +91,13 @@ public class AnnotatedBeanDefinitionReader {
 		// ConditionEvaluator是用来处理@Condition注解的
 		this.conditionEvaluator = new ConditionEvaluator(registry, environment, null);
 
-		// 会注册一些PostProcessor，包括：
-		// ConfigurationClassPostProcessor
-		// AutowiredAnnotationBeanPostProcessor
-		// CommonAnnotationBeanPostProcessor
-		// PersistenceAnnotationBeanPostProcessor
-		// EventListenerMethodProcessor
-		// DefaultEventListenerFactory
+		// ⭐注册注解配置处理器 - 最关键的一步：会注册一些PostProcessor，包括：
+		// ⭐ConfigurationClassPostProcessor：负责解析@Configuration类 处理@ComponentScan、@Bean、@Import等注解
+		// AutowiredAnnotationBeanPostProcessor：处理@Autowired、@Value注解的自动装配
+		// CommonAnnotationBeanPostProcessor：处理JSR-250注解 @Resource、@PostConstruct、@PreDestroy
+		// PersistenceAnnotationBeanPostProcessor：处理JPA注解（如@PersistenceContext、@PersistenceUnit）
+		// EventListenerMethodProcessor：处理@EventListener注解的方法
+		// DefaultEventListenerFactory：事件监听器的默认工厂
 		AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);
 	}
 

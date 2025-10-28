@@ -117,19 +117,27 @@ public abstract class AbstractRefreshableApplicationContext extends AbstractAppl
 	 * bean factory, shutting down the previous bean factory (if any) and
 	 * initializing a fresh bean factory for the next phase of the context's lifecycle.
 	 */
+	// XML方式
 	@Override	//AnnotationConfigWebApplicationContext会调它
 	protected final void refreshBeanFactory() throws BeansException {
+		// 1. 如果已有BeanFactory，先销毁
 		//判断如果有BeanFactory了就把它全部清空（可用反复刷新容器）
 		if (hasBeanFactory()) {
 			destroyBeans();
 			closeBeanFactory();
 		}
 		try {
+			// 2. 创建新的BeanFactory
 			DefaultListableBeanFactory beanFactory = createBeanFactory();
+
+			// 3. 配置BeanFactory
 			beanFactory.setSerializationId(getId());
 			beanFactory.setApplicationStartup(getApplicationStartup());
 			customizeBeanFactory(beanFactory);
+
+			// 4.加载Bean定义（解析XML等）
 			loadBeanDefinitions(beanFactory);
+
 			this.beanFactory = beanFactory;
 		}
 		catch (IOException ex) {
