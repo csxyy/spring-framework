@@ -609,6 +609,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		return getBeanNamesForType(type, true, true);
 	}
 
+	//主要处理：
+	//	1. 类型匹配：包括泛型、工厂Bean、代理对象等
+	//	2. 作用域处理：单例、原型、request、session等
+	//	3. 父子容器：在父子容器中递归查找
+	//	4. 延迟初始化：是否需要初始化延迟加载的Bean
 	@Override
 	public String[] getBeanNamesForType(@Nullable Class<?> type, boolean includeNonSingletons, boolean allowEagerInit) {
 		if (!isConfigurationFrozen() || type == null || !allowEagerInit) {
@@ -1111,20 +1116,26 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			logger.trace("Pre-instantiating singletons in " + this);
 		}
 
+		// 第一步：创建Bean名称的副本（防止在初始化过程中注册新的BeanDefinition导致并发修改）
 		// Iterate over a copy to allow for init methods which in turn register new bean definitions.
 		// While this may not be part of the regular factory bootstrap, it does otherwise work fine.
 		List<String> beanNames = new ArrayList<>(this.beanDefinitionNames);
 
+		// 第二步：设置预实例化线程状态（用于调试和监控）
 		// Trigger initialization of all non-lazy singleton beans...
 		this.preInstantiationThread.set(PreInstantiation.MAIN);
 		this.mainThreadPrefix = getThreadNamePrefix();
+
 		try {
+			// 第三步：并行初始化所有非懒加载单例Bean
 			List<CompletableFuture<?>> futures = new ArrayList<>();
 			for (String beanName : beanNames) {
 				// 得到合并后的RootBeanDefinition，RootBeanDefinition表示不能合并了
 				RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
+
+				// 条件判断：只实例化：非抽象 + 单例 + 非懒加载
 				if (!mbd.isAbstract() && mbd.isSingleton()) {
-					// 这里面会用线程池来并行创建每个Bean
+					// ⭐这里面会用线程池来并行创建每个Bean
 					CompletableFuture<?> future = preInstantiateSingleton(beanName, mbd);
 					if (future != null) {
 						futures.add(future);
@@ -1132,6 +1143,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 
+			// 第四步：阻塞等待所有异步任务完成
 			// 阻塞等待所有非懒加载的单例Bean创建完成
 			if (!futures.isEmpty()) {
 				try {
@@ -1143,10 +1155,12 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 		}
 		finally {
+			// 第五步：清理线程状态
 			this.mainThreadPrefix = null;
 			this.preInstantiationThread.remove();
 		}
 
+		// 第六步：执行所有SmartInitializingSingleton的回调
 		// Trigger post-initialization callback for all applicable beans...
 		// 执行所有SmartInitializingSingleton的afterSingletonsInstantiated()
 		for (String beanName : beanNames) {
@@ -1162,6 +1176,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 	@Nullable
 	private CompletableFuture<?> preInstantiateSingleton(String beanName, RootBeanDefinition mbd) {
+		// 第一步：检查是否支持后台初始化（异步创建）
 		// 默认为false（是否支持异步创建）
 		if (mbd.isBackgroundInit()) {
 			// 线程池
@@ -1169,23 +1184,26 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 			if (executor != null) {
 
+				// 第二步：先创建当前Bean所依赖的Bean（同步执行）
 				// 先创建当前Bean所依赖的Bean，这一步是直接在当前线程上执行的
 				String[] dependsOn = mbd.getDependsOn();
 				if (dependsOn != null) {
 					for (String dep : dependsOn) {
-						getBean(dep);
+						getBean(dep);	// 同步创建依赖的Bean
 					}
 				}
 
+				// 第三步：异步创建当前Bean
 				// 异步创建Bean
 				CompletableFuture<?> future = CompletableFuture.runAsync(
 						() -> instantiateSingletonInBackgroundThread(beanName), executor);
 
+				// 第四步：添加到三级缓存（处理循环依赖）
 				// 添加到三级缓存，出现循环依赖的时候就会阻塞了
 				// 有bug，当一个Bean在创建时，发现单例池中没有，但是自己正在创建过程中，应该要等另外的线程创建完，而不是等自己
 				addSingletonFactory(beanName, () -> {
 					try {
-						future.join();
+						future.join();	// 等待异步任务完成
 					}
 					catch (CompletionException ex) {
 						ReflectionUtils.rethrowRuntimeException(ex.getCause());
@@ -1201,10 +1219,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 		}
 
+		// 第五步：同步创建（默认情况）
 		// 默认情况下还是走的这里，直接在当前线程上进行创建
 		if (!mbd.isLazyInit()) {
 			try {
-				instantiateSingleton(beanName);
+				instantiateSingleton(beanName);	// 同步创建Bean
 			}
 			catch (BeanCurrentlyInCreationException ex) {
 				logger.info("Bean '" + beanName + "' marked for pre-instantiation (not lazy-init) " +
@@ -1231,8 +1250,10 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	}
 
 	private void instantiateSingleton(String beanName) {
+		// 第一步：判断是否为FactoryBean
 		// 根据beanName判断是不是FactoryBean，会根据beanName找到BeanDefinition，从而找到对应类型，从而进行判断
 		if (isFactoryBean(beanName)) {
+			// 情况1：处理FactoryBean
 			// 创建FactoryBean本身，先创建MyFactoryBean对象
 			Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
 
@@ -1243,6 +1264,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 		}
 		else {
+			// 情况2：处理普通Bean
 			getBean(beanName);
 		}
 	}

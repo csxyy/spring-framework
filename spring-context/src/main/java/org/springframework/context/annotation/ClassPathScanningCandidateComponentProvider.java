@@ -225,7 +225,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	protected void registerDefaultFilters() {
 		// 扫描
 
-		// @Component
+		// 添加@Component注解过滤器
 		this.includeFilters.add(new AnnotationTypeFilter(Component.class));
 
 		// @jakarta.annotation.ManagedBean
