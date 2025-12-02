@@ -133,6 +133,8 @@ public @interface EnableAspectJAutoProxy {
 	 * for retrieval via the {@link org.springframework.aop.framework.AopContext} class.
 	 * Off by default, i.e. no guarantees that {@code AopContext} access will work.
 	 * @since 4.3.1
+	 *
+	 * 设置为ture以后，就能通过 AopContext.currentProxy() 从当前线程的ThreadLocal中拿到当前的代理对象
 	 */
 	boolean exposeProxy() default false;
 

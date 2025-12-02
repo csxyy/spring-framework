@@ -87,6 +87,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 	 */
 	@SuppressWarnings("NullAway")
 	public List<Advisor> buildAspectJAdvisors() {
+		// aspectBeanNames是用来缓存BeanFactory中所存在的切面beanName的，第一次为null，后面就不为null了，不为null表示之前就
 		List<String> aspectNames = this.aspectBeanNames;
 
 		if (aspectNames == null) {
@@ -95,6 +96,8 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 				if (aspectNames == null) {
 					List<Advisor> advisors = new ArrayList<>();
 					aspectNames = new ArrayList<>();
+
+					// 把所有beanNames拿出来遍历，判断某个bean的类型是否是Aspect
 					String[] beanNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 							this.beanFactory, Object.class, true, false);
 					for (String beanName : beanNames) {
@@ -109,12 +112,18 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 						}
 						if (this.advisorFactory.isAspect(beanType)) {
 							try {
+								// 切面的注解信息
 								AspectMetadata amd = new AspectMetadata(beanType, beanName);
+
+								// 如果@Aspect不是perthis、pertarget，那么一个切面只会生成一个对象（单例）
+								// 并且会将该切面中所对应的Advisor对象进行缓存
 								if (amd.getAjType().getPerClause().getKind() == PerClauseKind.SINGLETON) {
 									MetadataAwareAspectInstanceFactory factory =
 											new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
+									// 利用BeanFactoryAspectInstanceFactory来解析Aspect类
 									List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
 									if (this.beanFactory.isSingleton(beanName)) {
+										// 缓存切面所对应的所有Advisor对象
 										this.advisorsCache.put(beanName, classAdvisors);
 									}
 									else {

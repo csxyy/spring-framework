@@ -82,6 +82,8 @@ public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Clonea
 	/**
 	 * List of MethodInterceptor and InterceptorAndDynamicMethodMatcher
 	 * that need dynamic checks.
+	 *
+	 * proxyFactory.addAdvice() 入参传进来的每个组件都会转换为MethodInterceptor，并形成一个链，存储在这个List里
 	 */
 	protected final List<?> interceptorsAndDynamicMethodMatchers;
 
@@ -159,28 +161,38 @@ public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Clonea
 	@Nullable
 	public Object proceed() throws Throwable {
 		// We start with an index of -1 and increment early.
+		// currentInterceptorIndex初始值为-1，每调用一个interceptor就会加1
+		// 当调用完了最后一个interceptor后就会执行被代理方法
 		if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
+			// 整个责任链全执行完了就去执行被代理对象的原方法
 			return invokeJoinpoint();
 		}
 
 		Object interceptorOrInterceptionAdvice =
 				this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+
+		// 当前interceptor是InterceptorAndDynamicMethodMatcher, 则先进行匹配，匹配成功再调用该interceptor
+		// 如果没有匹配则递归调用proceed()方法，调用下一个interceptor
 		if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher dm) {
 			// Evaluate dynamic method matcher here: static part will already have
 			// been evaluated and found to match.
 			Class<?> targetClass = (this.targetClass != null ? this.targetClass : this.method.getDeclaringClass());
+			// 动态匹配，根据方法参数匹配
 			if (dm.matcher().matches(this.method, targetClass, this.arguments)) {
 				return dm.interceptor().invoke(this);
 			}
 			else {
 				// Dynamic matching failed.
 				// Skip this interceptor and invoke the next in the chain.
+				// 不匹配则执行下一个MethodInterceptor
 				return proceed();
 			}
 		}
 		else {
 			// It's an interceptor, so we just invoke it: The pointcut will have
 			// been evaluated statically before this object was constructed.
+			// 直接调用MethodInterceptor，传入this，在内部会在次调用proceed()方法进行递归
+			// 比如MethodBeforeAdviceInterceptor
 			return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
 		}
 	}
